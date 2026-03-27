@@ -9,6 +9,7 @@ import (
 	"github.com/bluesky-social/indigo/atproto/auth/oauth"
 	"github.com/bluesky-social/indigo/atproto/identity"
 	"github.com/gorilla/sessions"
+
 	"github.com/jr-dragon/pds-oauth/internal/data"
 	"github.com/jr-dragon/pds-oauth/internal/lib/libhttp"
 	"github.com/jr-dragon/pds-oauth/internal/lib/liblogs"

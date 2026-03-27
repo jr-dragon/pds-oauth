@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"net"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -17,9 +19,40 @@ import (
 type AppConfig struct {
 	Name    string `default:"pds-auth"`
 	Version string `default:"0.0.0"`
+	URL     string `mapstructure:"url" env:"APP_URL"`
 
 	Key      []byte
-	KeyValue string `mapstructure:"key" env:"APP_ENV"`
+	KeyValue string `mapstructure:"key" env:"APP_KEY"`
+}
+
+func (c AppConfig) IsLocal() bool {
+	u, err := url.ParseRequestURI(c.URL)
+	if err != nil {
+		// handle invalid URL format
+		return false
+	}
+
+	host := u.Host
+	// Remove port if present (e.g., "localhost:8080" becomes "localhost")
+	if strings.Contains(host, ":") {
+		h, _, err := net.SplitHostPort(host)
+		if err != nil {
+			// handle error in splitting host and port
+			return false
+		}
+		host = h
+	}
+
+	// Check if the hostname is a common loopback identifier
+	switch host {
+	case "localhost", "127.0.0.1", "::1", "":
+		// An empty host might indicate a file:/// style URL or similar, which is local
+		return true
+	}
+
+	// You can also check if the resolved IP is a loopback address
+	// This is more complex and usually not necessary if checking the hostname string
+	return false
 }
 
 type ServerConfig struct {

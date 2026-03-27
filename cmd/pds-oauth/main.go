@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"log/slog"
-	"net/http"
 	"os"
 
 	"github.com/jr-dragon/pds-oauth/internal/data"
@@ -35,9 +34,7 @@ func main() {
 		return
 	}
 
-	srv := &http.Server{
-		Addr: cfg.Server.Addr,
-	}
+	srv := newServer(cfg)
 	slog.Info("starting http server", slog.String("addr", cfg.Server.Addr))
 
 	if err := srv.ListenAndServe(); err != nil {
