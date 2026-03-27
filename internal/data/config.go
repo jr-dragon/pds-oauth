@@ -1,9 +1,14 @@
 package data
 
 import (
+	"encoding/base64"
+	"encoding/hex"
+	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/gookit/config/v2"
 	"github.com/gookit/config/v2/yaml"
@@ -12,6 +17,9 @@ import (
 type AppConfig struct {
 	Name    string `default:"pds-auth"`
 	Version string `default:"0.0.0"`
+
+	Key      []byte
+	KeyValue string `mapstructure:"key" env:"APP_ENV"`
 }
 
 type ServerConfig struct {
@@ -67,6 +75,23 @@ func NewConfig(name, version string, paths ...string) (*Config, error) {
 	}
 	if version != "" {
 		cfg.App.Version = version
+	}
+	if cfg.App.KeyValue == "" {
+		return nil, errors.New("missing application key")
+	} else {
+		var err error
+		switch {
+		case strings.HasPrefix(cfg.App.KeyValue, "hex:"):
+			trimmed := strings.TrimPrefix(cfg.App.KeyValue, "hex:")
+			if cfg.App.Key, err = hex.DecodeString(trimmed); err != nil {
+				return nil, fmt.Errorf("failed to decode key from hex: %w", err)
+			}
+		case strings.HasPrefix(cfg.App.KeyValue, "base64:"):
+			trimmed := strings.TrimPrefix(cfg.App.KeyValue, "base64:")
+			if cfg.App.Key, err = base64.StdEncoding.DecodeString(trimmed); err != nil {
+				return nil, fmt.Errorf("failed to decode key from base64: %w", err)
+			}
+		}
 	}
 
 	return cfg, nil
