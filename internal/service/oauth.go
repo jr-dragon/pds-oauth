@@ -1,7 +1,6 @@
 package service
 
 import (
-	"encoding/json"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -54,8 +53,7 @@ func (svc *OAuth) Start(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(startResponse{RedirectURL: redirectURL})
+	http.Redirect(w, r, redirectURL, http.StatusFound)
 }
 
 // Callback handles GET /oauth/callback.
@@ -86,7 +84,7 @@ func (svc *OAuth) Callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sess.Values["AccountDID"] = sessData.AccountDID
+	sess.Values["AccountDID"] = string(sessData.AccountDID)
 	sess.Values["SessionID"] = sessData.SessionID
 	sess.Values["handle"] = handle
 	if err := sess.Save(r, w); err != nil {
