@@ -3,24 +3,26 @@
 package main
 
 import (
-	"net/http"
-
-	"github.com/mazrean/kessoku"
-	"golang.org/x/net/http2"
-	"golang.org/x/net/http2/h2c"
-
 	"github.com/jr-dragon/pds-oauth/internal/data"
 	"github.com/jr-dragon/pds-oauth/internal/server"
 	"github.com/jr-dragon/pds-oauth/internal/service"
+	"github.com/mazrean/kessoku"
+	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/h2c"
+	"net/http"
 )
 
 func newServer(config *data.Config) *http.Server {
+	user := kessoku.Provide(service.NewUser).Fn()(config)
 	clientApp := kessoku.Provide(newOAuthClientApp).Fn()(config)
+	userHandler := kessoku.Bind[server.UserHandler](kessoku.Provide(func(svc *service.User) server.UserHandler {
+		return svc
+	})).Fn()(user)
 	oauth0 := kessoku.Provide(service.NewOAuth).Fn()(config, clientApp)
 	oauthHandler := kessoku.Bind[server.OAuthHandler](kessoku.Provide(func(svc *service.OAuth) server.OAuthHandler {
 		return svc
 	})).Fn()(oauth0)
-	handler := kessoku.Provide(server.NewHandler).Fn()(oauthHandler)
+	handler := kessoku.Provide(server.NewHandler).Fn()(oauthHandler, userHandler)
 	server0 := kessoku.Provide(func(cfg *data.Config, handler http.Handler) *http.Server {
 		return &http.Server{Addr: cfg.Server.Addr, Handler: h2c.NewHandler(handler, &http2.Server{})}
 	}).Fn()(config, handler)

@@ -19,14 +19,16 @@ import (
 type AppConfig struct {
 	Name    string `default:"pds-auth"`
 	Version string `default:"0.0.0"`
-	URL     string `mapstructure:"url" env:"APP_URL"`
 
-	Key      []byte
+	URL      *url.URL `mapstructure:"-"`
+	URLValue string   `mapstructure:"url" env:"APP_URL"`
+
+	Key      []byte `mapstructure:"-"`
 	KeyValue string `mapstructure:"key" env:"APP_KEY"`
 }
 
 func (c AppConfig) IsLocal() bool {
-	u, err := url.ParseRequestURI(c.URL)
+	u, err := url.ParseRequestURI(c.URLValue)
 	if err != nil {
 		// handle invalid URL format
 		return false
@@ -125,6 +127,11 @@ func NewConfig(name, version string, paths ...string) (*Config, error) {
 				return nil, fmt.Errorf("failed to decode key from base64: %w", err)
 			}
 		}
+	}
+	if u, err := url.Parse(cfg.App.URLValue); err != nil {
+		return nil, err
+	} else {
+		cfg.App.URL = u
 	}
 
 	return cfg, nil

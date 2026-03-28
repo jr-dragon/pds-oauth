@@ -4,7 +4,6 @@ package main
 
 import (
 	"net/http"
-	"path"
 
 	"github.com/bluesky-social/indigo/atproto/auth/oauth"
 	"github.com/mazrean/kessoku"
@@ -25,7 +24,9 @@ var _ = kessoku.Inject[*http.Server](
 	"newServer",
 	kessoku.Provide(newOAuthClientApp),
 	kessoku.Provide(service.NewOAuth),
+	kessoku.Provide(service.NewUser),
 	kessoku.Bind[server.OAuthHandler](kessoku.Provide(func(svc *service.OAuth) server.OAuthHandler { return svc })),
+	kessoku.Bind[server.UserHandler](kessoku.Provide(func(svc *service.User) server.UserHandler { return svc })),
 	kessoku.Provide(server.NewHandler),
 	kessoku.Provide(func(cfg *data.Config, handler http.Handler) *http.Server {
 		return &http.Server{
@@ -42,11 +43,11 @@ func newOAuthClientApp(cfg *data.Config) *oauth.ClientApp {
 
 	var clientCfg oauth.ClientConfig
 	if cfg.App.IsLocal() {
-		clientCfg = oauth.NewLocalhostConfig(cfg.App.URL, scopes)
+		clientCfg = oauth.NewLocalhostConfig(cfg.App.URL.JoinPath("/oauth/callback").String(), scopes)
 	} else {
 		clientCfg = oauth.NewPublicConfig(
-			path.Join(cfg.App.URL, "oauth/client-metadata.json"),
-			cfg.App.URL,
+			cfg.App.URL.JoinPath("oauth/client-metadata.json").String(),
+			cfg.App.URL.JoinPath("/oauth/callback").String(),
 			scopes,
 		)
 	}

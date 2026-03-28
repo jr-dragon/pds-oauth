@@ -1,6 +1,7 @@
 package service
 
 import (
+	"encoding/json"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -28,11 +29,6 @@ func NewOAuth(cfg *data.Config, client *oauth.ClientApp) *OAuth {
 
 func (svc *OAuth) ClientConfig(w http.ResponseWriter, r *http.Request) {
 	libhttp.WriteJSON(w, http.StatusOK, svc.client.Config.ClientMetadata())
-}
-
-// startResponse is the JSON body returned by GET /oauth/start.
-type startResponse struct {
-	RedirectURL string `json:"redirect_url"`
 }
 
 // Start handles GET /oauth/start?handle=<handle>.
@@ -63,30 +59,34 @@ func (svc *OAuth) Start(w http.ResponseWriter, r *http.Request) {
 // exchange, creates a server-side session, sets the httpOnly cookie, and
 // redirects the browser to the home page.
 func (svc *OAuth) Callback(w http.ResponseWriter, r *http.Request) {
-	sessData, err := svc.client.ProcessCallback(r.Context(), r.URL.Query())
+	atSession, err := svc.client.ProcessCallback(r.Context(), r.URL.Query())
 	if err != nil {
 		slog.WarnContext(r.Context(), "failed to get OAuth callback", liblogs.ErrAttr(err))
 		http.Redirect(w, r, "/?error="+err.Error(), http.StatusFound)
 		return
 	}
 
-	var handle string
-	if ident, err := identity.DefaultDirectory().LookupDID(r.Context(), sessData.AccountDID); err == nil {
-		handle = ident.Handle.String()
-	} else {
-		slog.WarnContext(r.Context(), "failed to lookup DID", liblogs.ErrAttr(err), slog.Any("DID", sessData.AccountDID))
+	atIdent, err := identity.DefaultDirectory().LookupDID(r.Context(), atSession.AccountDID)
+	if err != nil {
+		slog.WarnContext(r.Context(), "failed to lookup DID", liblogs.ErrAttr(err), slog.Any("at_session", atSession))
 	}
 
-	sess, err := svc.store.Get(r, "oauth")
+	sess, err := svc.store.Get(r, "atproto")
 	if err != nil {
 		slog.ErrorContext(r.Context(), "failed to get oauth session", liblogs.ErrAttr(err))
 		http.Redirect(w, r, "/?error=failed to process oauth session", http.StatusFound)
 		return
 	}
 
-	sess.Values["AccountDID"] = string(sessData.AccountDID)
-	sess.Values["SessionID"] = sessData.SessionID
-	sess.Values["handle"] = handle
+	if sess.Values["Session"], err = json.Marshal(atSession); err != nil {
+		slog.ErrorContext(r.Context(), "failed to marshal json", liblogs.ErrAttr(err))
+		libhttp.WriteError(w, http.StatusInternalServerError, "")
+		return
+	}
+	if sess.Values["Identity"], err = json.Marshal(atIdent); err != nil {
+		slog.ErrorContext(r.Context(), "failed to marshal json", liblogs.ErrAttr(err))
+		libhttp.WriteError(w, http.StatusInternalServerError, "")
+	}
 	if err := sess.Save(r, w); err != nil {
 		slog.ErrorContext(r.Context(), "failed to save oauth session", liblogs.ErrAttr(err))
 		http.Redirect(w, r, "/?error=failed to process oauth session", http.StatusFound)
