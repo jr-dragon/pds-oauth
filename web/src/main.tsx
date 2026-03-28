@@ -5,8 +5,20 @@ import ReactDOM from "react-dom/client";
 import { routeTree } from "./routeTree.gen";
 import "./index.css";
 
+async function fetchAuthContext() {
+	try {
+		const res = await fetch("/api/me");
+		return { isLoggedIn: res.ok };
+	} catch {
+		return { isLoggedIn: false };
+	}
+}
+
 // Create a new router instance
-const router = createRouter({ routeTree });
+const router = createRouter({
+	routeTree,
+	context: await fetchAuthContext(),
+});
 
 // Register the router instance for type safety
 declare module "@tanstack/react-router" {
