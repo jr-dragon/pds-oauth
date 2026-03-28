@@ -30,6 +30,10 @@ func (svc *User) Me(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	slog.InfoContext(r.Context(), "session", slog.Any("session", sess))
+	if _, ok := sess.Values["Session"]; !ok {
+		libhttp.WriteError(w, http.StatusUnauthorized, "")
+		return
+	}
+
 	w.WriteHeader(http.StatusNoContent)
 }

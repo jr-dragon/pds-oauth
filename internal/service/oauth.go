@@ -16,12 +16,14 @@ import (
 )
 
 type OAuth struct {
+	cfg    *data.Config
 	client *oauth.ClientApp
 	store  sessions.Store
 }
 
 func NewOAuth(cfg *data.Config, client *oauth.ClientApp) *OAuth {
 	return &OAuth{
+		cfg:    cfg,
 		client: client,
 		store:  sessions.NewCookieStore(cfg.App.Key),
 	}
@@ -71,6 +73,8 @@ func (svc *OAuth) Callback(w http.ResponseWriter, r *http.Request) {
 		slog.WarnContext(r.Context(), "failed to lookup DID", liblogs.ErrAttr(err), slog.Any("at_session", atSession))
 	}
 
+	slog.InfoContext(r.Context(), "processed callback", slog.Any("at_session", atSession), slog.Any("at_identity", atIdent))
+
 	sess, err := svc.store.Get(r, "atproto")
 	if err != nil {
 		slog.ErrorContext(r.Context(), "failed to get oauth session", liblogs.ErrAttr(err))
@@ -87,6 +91,15 @@ func (svc *OAuth) Callback(w http.ResponseWriter, r *http.Request) {
 		slog.ErrorContext(r.Context(), "failed to marshal json", liblogs.ErrAttr(err))
 		libhttp.WriteError(w, http.StatusInternalServerError, "")
 	}
+
+	sess.Options = &sessions.Options{
+		Path:     "/",
+		MaxAge:   86400 * 14, // official PDS refresh token expires in 2 weeks for public clients.
+		Secure:   !svc.cfg.App.IsLocal(),
+		HttpOnly: true,
+		SameSite: http.SameSiteStrictMode,
+	}
+	
 	if err := sess.Save(r, w); err != nil {
 		slog.ErrorContext(r.Context(), "failed to save oauth session", liblogs.ErrAttr(err))
 		http.Redirect(w, r, "/?error=failed to process oauth session", http.StatusFound)
