@@ -1,0 +1,29 @@
+services:
+  backend:
+    build: .
+    restart: unless-stopped
+
+  frontend:
+    build: ./web
+    volumes:
+      - frontend_dist:/srv
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - frontend_dist:/srv:ro
+      - caddy_data:/data
+      - R:/config
+    depends_on:
+      frontend:
+        condition: service_completed_successfully
+
+volumes:
+  frontend_dist:
+  caddy_data:
+  caddy_config:
